@@ -68,7 +68,8 @@ public class TestIcebergConfig
                 .setSortedWritingEnabled(true)
                 .setQueryPartitionFilterRequired(false)
                 .setSplitManagerThreads(Runtime.getRuntime().availableProcessors() * 2)
-                .setIncrementalRefreshEnabled(true));
+                .setIncrementalRefreshEnabled(true)
+                .setCaseInsensitiveNameMatching(false));
     }
 
     @Test
@@ -101,6 +102,7 @@ public class TestIcebergConfig
                 .put("iceberg.query-partition-filter-required", "true")
                 .put("iceberg.split-manager-threads", "42")
                 .put("iceberg.incremental-refresh-enabled", "false")
+                .put("iceberg.case-insensitive-name-matching", "true")
                 .buildOrThrow();
 
         IcebergConfig expected = new IcebergConfig()
@@ -129,7 +131,8 @@ public class TestIcebergConfig
                 .setSortedWritingEnabled(false)
                 .setQueryPartitionFilterRequired(true)
                 .setSplitManagerThreads(42)
-                .setIncrementalRefreshEnabled(false);
+                .setIncrementalRefreshEnabled(false)
+                .setCaseInsensitiveNameMatching(true);
 
         assertFullMapping(properties, expected);
     }
