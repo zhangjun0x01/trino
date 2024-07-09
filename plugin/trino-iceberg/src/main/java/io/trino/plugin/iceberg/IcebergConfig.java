@@ -80,6 +80,7 @@ public class IcebergConfig
     private boolean queryPartitionFilterRequired;
     private int splitManagerThreads = Runtime.getRuntime().availableProcessors() * 2;
     private boolean incrementalRefreshEnabled = true;
+    private boolean caseInsensitiveNameMatching;
 
     public CatalogType getCatalogType()
     {
@@ -409,6 +410,19 @@ public class IcebergConfig
     public IcebergConfig setQueryPartitionFilterRequired(boolean queryPartitionFilterRequired)
     {
         this.queryPartitionFilterRequired = queryPartitionFilterRequired;
+        return this;
+    }
+
+    public boolean isCaseInsensitiveNameMatching()
+    {
+        return caseInsensitiveNameMatching;
+    }
+
+    @Config("iceberg.case-insensitive-name-matching")
+    @ConfigDescription("Support case insensitive schema and table names")
+    public IcebergConfig setCaseInsensitiveNameMatching(boolean caseInsensitiveNameMatching)
+    {
+        this.caseInsensitiveNameMatching = caseInsensitiveNameMatching;
         return this;
     }
 

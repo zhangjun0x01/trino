@@ -469,6 +469,11 @@ public final class IcebergUtil
         return quotedName(name.getSchemaName()) + "." + quotedName(name.getTableName());
     }
 
+    public static String quotedTableName(String schemaName, String tableName)
+    {
+        return quotedName(schemaName) + "." + quotedName(tableName);
+    }
+
     private static String quotedName(String name)
     {
         if (SIMPLE_NAME.matcher(name).matches()) {

@@ -176,7 +176,10 @@ implementation is used:
     creation of more data files, since it uses the append operation to insert
     the new records.
   - `true`
-:::
+* - `iceberg.case-insensitive-name-matching`
+  - Support case insensitive schema and table names, it is only effective for rest catalog currently.
+  - `false`
+  :::
 
 (iceberg-file-system-configuration)=
 ## File system access configuration

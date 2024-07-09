@@ -22,8 +22,11 @@ import io.airlift.log.Logger;
 import io.jsonwebtoken.impl.DefaultJwtBuilder;
 import io.jsonwebtoken.jackson.io.JacksonSerializer;
 import io.trino.cache.EvictableCacheBuilder;
+import io.trino.plugin.base.mapping.IdentifierMapping;
+import io.trino.plugin.base.mapping.RemoteIdentifiers;
 import io.trino.plugin.hive.metastore.TableInfo;
 import io.trino.plugin.iceberg.ColumnIdentity;
+import io.trino.plugin.iceberg.IcebergRemoteIdentifiers;
 import io.trino.plugin.iceberg.IcebergSchemaProperties;
 import io.trino.plugin.iceberg.IcebergUtil;
 import io.trino.plugin.iceberg.catalog.TrinoCatalog;
@@ -41,6 +44,7 @@ import io.trino.spi.connector.SchemaNotFoundException;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.TableNotFoundException;
 import io.trino.spi.connector.ViewNotFoundException;
+import io.trino.spi.security.ConnectorIdentity;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.type.TypeManager;
 import org.apache.iceberg.BaseTable;
@@ -105,7 +109,8 @@ public class TrinoRestCatalog
     private final SessionType sessionType;
     private final String trinoVersion;
     private final boolean useUniqueTableLocation;
-
+    private final IdentifierMapping identifierMapping;
+    private final boolean caseInsensitiveNameMatching;
     private final Cache<SchemaTableName, Table> tableCache = EvictableCacheBuilder.newBuilder()
             .maximumSize(PER_QUERY_CACHE_SIZE)
             .build();
@@ -116,7 +121,9 @@ public class TrinoRestCatalog
             SessionType sessionType,
             String trinoVersion,
             TypeManager typeManager,
-            boolean useUniqueTableLocation)
+            boolean useUniqueTableLocation,
+            IdentifierMapping identifierMapping,
+            boolean caseInsensitiveNameMatching)
     {
         this.restSessionCatalog = requireNonNull(restSessionCatalog, "restSessionCatalog is null");
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
@@ -124,6 +131,8 @@ public class TrinoRestCatalog
         this.trinoVersion = requireNonNull(trinoVersion, "trinoVersion is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.useUniqueTableLocation = useUniqueTableLocation;
+        this.identifierMapping = identifierMapping;
+        this.caseInsensitiveNameMatching = caseInsensitiveNameMatching;
     }
 
     @Override
@@ -329,13 +338,29 @@ public class TrinoRestCatalog
     public Table loadTable(ConnectorSession session, SchemaTableName schemaTableName)
     {
         try {
+            if (!caseInsensitiveNameMatching) {
+                return uncheckedCacheGet(
+                        tableCache,
+                        schemaTableName,
+                        () -> {
+                            BaseTable baseTable = (BaseTable) restSessionCatalog.loadTable(convert(session), toIdentifier(schemaTableName));
+                            // Creating a new base table is necessary to adhere to Trino's expectations for quoted table names
+                            return new BaseTable(baseTable.operations(), quotedTableName(schemaTableName));
+                        });
+            }
+
+            RemoteIdentifiers remoteIdentifiers = getRemoteIdentifiers(convert(session));
+            ConnectorIdentity identity = session.getIdentity();
+            String newRemoteSchemaName = identifierMapping.toRemoteSchemaName(remoteIdentifiers, identity, schemaTableName.getSchemaName());
+            String remoteTableName = identifierMapping.toRemoteTableName(remoteIdentifiers, identity, schemaTableName.getSchemaName(), schemaTableName.getTableName());
+
             return uncheckedCacheGet(
                     tableCache,
                     schemaTableName,
                     () -> {
                         BaseTable baseTable = (BaseTable) restSessionCatalog.loadTable(convert(session), toIdentifier(schemaTableName));
                         // Creating a new base table is necessary to adhere to Trino's expectations for quoted table names
-                        return new BaseTable(baseTable.operations(), quotedTableName(schemaTableName));
+                        return new BaseTable(baseTable.operations(), quotedTableName(newRemoteSchemaName, remoteTableName));
                     });
         }
         catch (UncheckedExecutionException e) {
@@ -344,6 +369,11 @@ public class TrinoRestCatalog
             }
             throw new TrinoException(ICEBERG_CATALOG_ERROR, format("Failed to load table: %s", schemaTableName), e.getCause());
         }
+    }
+
+    private RemoteIdentifiers getRemoteIdentifiers(SessionContext sessionContext)
+    {
+        return new IcebergRemoteIdentifiers(restSessionCatalog, sessionContext);
     }
 
     @Override

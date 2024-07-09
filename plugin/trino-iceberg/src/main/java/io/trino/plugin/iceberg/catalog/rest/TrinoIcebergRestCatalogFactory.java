@@ -16,6 +16,7 @@ package io.trino.plugin.iceberg.catalog.rest;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 import com.google.inject.Inject;
+import io.trino.plugin.base.mapping.IdentifierMapping;
 import io.trino.plugin.hive.NodeVersion;
 import io.trino.plugin.iceberg.IcebergConfig;
 import io.trino.plugin.iceberg.IcebergFileSystemFactory;
@@ -49,6 +50,8 @@ public class TrinoIcebergRestCatalogFactory
     private final SecurityProperties securityProperties;
     private final boolean uniqueTableLocation;
     private final TypeManager typeManager;
+    private final IdentifierMapping identifierMapping;
+    private final boolean caseInsensitiveNameMatching;
 
     @GuardedBy("this")
     private RESTSessionCatalog icebergCatalog;
@@ -61,7 +64,8 @@ public class TrinoIcebergRestCatalogFactory
             SecurityProperties securityProperties,
             IcebergConfig icebergConfig,
             TypeManager typeManager,
-            NodeVersion nodeVersion)
+            NodeVersion nodeVersion,
+            IdentifierMapping identifierMapping)
     {
         this.fileSystemFactory = requireNonNull(fileSystemFactory, "fileSystemFactory is null");
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
@@ -76,6 +80,8 @@ public class TrinoIcebergRestCatalogFactory
         requireNonNull(icebergConfig, "icebergConfig is null");
         this.uniqueTableLocation = icebergConfig.isUniqueTableLocation();
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
+        this.identifierMapping = identifierMapping;
+        this.caseInsensitiveNameMatching = icebergConfig.isCaseInsensitiveNameMatching();
     }
 
     @Override
@@ -108,6 +114,6 @@ public class TrinoIcebergRestCatalogFactory
             icebergCatalog = icebergCatalogInstance;
         }
 
-        return new TrinoRestCatalog(icebergCatalog, catalogName, sessionType, trinoVersion, typeManager, uniqueTableLocation);
+        return new TrinoRestCatalog(icebergCatalog, catalogName, sessionType, trinoVersion, typeManager, uniqueTableLocation, identifierMapping, caseInsensitiveNameMatching);
     }
 }
